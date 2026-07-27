@@ -6,3 +6,4 @@ dist/
 .expo/
 data/seed/*.sqlite
 data/seed/downloads/
+server/.dev-data/

@@ -7,7 +7,8 @@
     "typecheck": "tsc --build && tsc -p data/seed/tsconfig.json && tsc -p tsconfig.test.json && tsc --noEmit -p apps/mobile/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke": "tsx scripts/smoke.mts"
+    "smoke": "tsx scripts/smoke.mts",
+    "dev:api": "tsx server/src/dev.ts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",
