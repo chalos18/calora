@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, fromIsoDate, toIsoDate } from "./dates.js";
+import { addDays, fromIsoDate, toIsoDate } from "./dates";
 
 describe("toIsoDate", () => {
   it("uses the local calendar date, not the UTC one", () => {

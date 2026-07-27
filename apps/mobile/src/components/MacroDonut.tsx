@@ -53,7 +53,10 @@ export const MacroDonut = ({
   return (
     <View style={{ width: size, height: size }}>
       <Svg width={size} height={size}>
-        <G rotation={-90} originX={size / 2} originY={size / 2}>
+        {/* A transform string rather than rotation/originX: react-native-svg
+            forwards those to the DOM as an invalid `transform-origin`
+            property on web, which React reports as an error. */}
+        <G transform={`rotate(-90 ${size / 2} ${size / 2})`}>
           <Circle
             cx={size / 2}
             cy={size / 2}
