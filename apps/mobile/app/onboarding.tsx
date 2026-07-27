@@ -2,8 +2,13 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api } from "../src/api";
+import { api, ApiError, isNetworkError } from "../src/api";
 import { Card, RoundButton } from "../src/components/ui";
+import { dateInputPlaceholder, parseDateInput } from "../src/date-input";
+import {
+  validateOnboarding,
+  type OnboardingErrors,
+} from "../src/onboarding-validation";
 import { useSession } from "../src/session";
 import { theme } from "../src/theme";
 
@@ -35,15 +40,29 @@ export default function OnboardingScreen() {
   const [activityLevel, setActivityLevel] =
     useState<(typeof ACTIVITY_LEVELS)[number]["key"]>("moderate");
   const [goalType, setGoalType] = useState<(typeof GOALS)[number]["key"]>("maintain");
-  const [error, setError] = useState<string | null>(null);
+
+  const [errors, setErrors] = useState<OnboardingErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Resolved from the device, so someone in New Zealand types 15-01-1996 and
+  // someone in the United States types 01-15-1996, each in their own order.
+  const datePlaceholder = dateInputPlaceholder();
 
   const submit = async () => {
-    setError(null);
+    const found = validateOnboarding({ email, birthDate, heightCm, weightKg });
+    setErrors(found);
+    setFormError(null);
+
+    if (Object.keys(found).length > 0) return;
+
+    setSubmitting(true);
     try {
       const { userId } = await api.onboard({
-        email,
+        email: email.trim(),
         sexAtBirth,
-        birthDate,
+        // Sent as ISO; validation above guarantees this parses.
+        birthDate: parseDateInput(birthDate)!,
         heightCm: Number(heightCm),
         weightKg: Number(weightKg),
         activityLevel,
@@ -51,8 +70,20 @@ export default function OnboardingScreen() {
       });
       setUserId(userId);
       router.replace("/(tabs)");
-    } catch {
-      setError("Please check the details and try again.");
+    } catch (cause) {
+      // Server-side field errors land in the same map as local ones, so they
+      // render against the input they refer to rather than as a banner.
+      if (cause instanceof ApiError && Object.keys(cause.fields).length > 0) {
+        setErrors(cause.fields as OnboardingErrors);
+      } else if (isNetworkError(cause)) {
+        setFormError(
+          "Could not reach Calora's server on port 3000. Start it with: pnpm dev:api",
+        );
+      } else {
+        setFormError("Could not save your details. Please try again.");
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -60,6 +91,7 @@ export default function OnboardingScreen() {
     <ScrollView
       style={styles.screen}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 24 }]}
+      keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.title}>Welcome to Calora</Text>
       <Text style={styles.intro}>
@@ -67,12 +99,19 @@ export default function OnboardingScreen() {
       </Text>
 
       <Card style={styles.card}>
-        <Field label="Email" value={email} onChange={setEmail} placeholder="you@example.com" />
+        <Field
+          label="Email"
+          value={email}
+          onChange={setEmail}
+          placeholder="you@example.com"
+          error={errors.email}
+        />
         <Field
           label="Date of birth"
           value={birthDate}
           onChange={setBirthDate}
-          placeholder="YYYY-MM-DD"
+          placeholder={datePlaceholder}
+          error={errors.birthDate}
         />
         <Field
           label="Height (cm)"
@@ -80,6 +119,7 @@ export default function OnboardingScreen() {
           onChange={setHeightCm}
           placeholder="165"
           numeric
+          error={errors.heightCm}
         />
         <Field
           label="Weight (kg)"
@@ -87,6 +127,7 @@ export default function OnboardingScreen() {
           onChange={setWeightKg}
           placeholder="60"
           numeric
+          error={errors.weightKg}
         />
       </Card>
 
@@ -140,28 +181,47 @@ export default function OnboardingScreen() {
         </View>
       </Card>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {formError ? (
+        <Card style={styles.formErrorCard}>
+          <Text style={styles.formErrorText}>{formError}</Text>
+        </Card>
+      ) : null}
 
-      <RoundButton label="Work out my goals" onPress={() => void submit()} />
+      <RoundButton
+        label={submitting ? "Working it out…" : "Work out my goals"}
+        onPress={() => void submit()}
+      />
     </ScrollView>
   );
 }
 
+/**
+ * A labelled input. When invalid, the message sits directly above the input it
+ * refers to and the input itself is outlined, so the problem and the thing to
+ * fix are in the same place.
+ */
 const Field = ({
   label,
   value,
   onChange,
   placeholder,
   numeric,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   numeric?: boolean;
+  error?: string | undefined;
 }) => (
   <View>
     <Text style={styles.fieldLabel}>{label}</Text>
+    {error ? (
+      <Text style={styles.fieldError} accessibilityRole="alert">
+        {error}
+      </Text>
+    ) : null}
     <TextInput
       value={value}
       onChangeText={onChange}
@@ -170,7 +230,9 @@ const Field = ({
       keyboardType={numeric ? "decimal-pad" : "default"}
       autoCapitalize="none"
       autoCorrect={false}
-      style={styles.input}
+      accessibilityLabel={label}
+      aria-invalid={error !== undefined}
+      style={[styles.input, error ? styles.inputInvalid : null]}
     />
   </View>
 );
@@ -210,6 +272,12 @@ const styles = StyleSheet.create({
   },
   hint: { color: theme.colour.textMuted, fontSize: theme.font.label, lineHeight: 18 },
   fieldLabel: { color: theme.colour.textMuted, fontSize: theme.font.label, marginBottom: 6 },
+  fieldError: {
+    color: theme.colour.danger,
+    fontSize: theme.font.label,
+    lineHeight: 18,
+    marginBottom: 6,
+  },
   input: {
     backgroundColor: theme.colour.surfaceRaised,
     borderRadius: theme.radius.pill,
@@ -217,6 +285,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: theme.colour.text,
     fontSize: theme.font.body,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  inputInvalid: {
+    borderColor: theme.colour.danger,
+    backgroundColor: "rgba(199, 93, 74, 0.08)",
   },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.space(1) },
   chip: {
@@ -240,5 +314,10 @@ const styles = StyleSheet.create({
   optionSelected: { borderColor: theme.colour.accent },
   optionLabel: { color: theme.colour.text, fontSize: theme.font.body, fontWeight: "600" },
   optionHint: { color: theme.colour.textMuted, fontSize: theme.font.label, marginTop: 2 },
-  error: { color: theme.colour.danger, fontSize: theme.font.body },
+  formErrorCard: {
+    backgroundColor: "rgba(199, 93, 74, 0.12)",
+    borderWidth: 1,
+    borderColor: theme.colour.danger,
+  },
+  formErrorText: { color: theme.colour.text, fontSize: theme.font.label, lineHeight: 19 },
 });

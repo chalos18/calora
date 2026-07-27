@@ -10,6 +10,26 @@ const baseUrl =
   process.env.EXPO_PUBLIC_API_URL ??
   "http://localhost:3000";
 
+/**
+ * A failed request, carrying any per-field messages the server returned so the
+ * UI can show each one against the input it belongs to.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly fields: Record<string, string>,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+/** True when the request never reached the server at all. */
+export const isNetworkError = (cause: unknown): boolean =>
+  cause instanceof TypeError ||
+  (cause instanceof Error && /fetch|network/i.test(cause.message));
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
@@ -19,8 +39,13 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as {
       error?: string;
+      fields?: Record<string, string>;
     };
-    throw new Error(body.error ?? `Request failed: ${response.status}`);
+    throw new ApiError(
+      body.error ?? `Request failed: ${response.status}`,
+      response.status,
+      body.fields ?? {},
+    );
   }
 
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
