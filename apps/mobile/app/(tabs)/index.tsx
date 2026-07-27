@@ -18,7 +18,7 @@ import { useSession } from "../../src/session";
 import { MEAL_SLOTS, theme } from "../../src/theme";
 
 export default function DiaryScreen() {
-  const { userId } = useSession();
+  const { userId, isReady } = useSession();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -42,6 +42,16 @@ export default function DiaryScreen() {
       void load();
     }, [load]),
   );
+
+  // Wait for the stored session before deciding; redirecting on first paint
+  // would bounce a returning user back through onboarding.
+  if (!isReady) {
+    return (
+      <View style={styles.booting}>
+        <ActivityIndicator color={theme.colour.accent} />
+      </View>
+    );
+  }
 
   if (!userId) return <Redirect href="/onboarding" />;
 
@@ -219,6 +229,12 @@ const Summary = ({ label, value }: { label: string; value: number | null }) => (
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.colour.background },
+  booting: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colour.background,
+  },
   content: { padding: theme.space(2), paddingBottom: theme.space(6), gap: theme.space(2) },
 
   dayNav: {
