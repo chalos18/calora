@@ -10,6 +10,7 @@ const foods: SeedFood[] = [
   {
     fdcId: "100",
     name: "Beans, black, boiled",
+    densityCategory: "legume_cooked",
     kcal: 132,
     protein: 8.86,
     carbs: 23.71,
@@ -20,6 +21,7 @@ const foods: SeedFood[] = [
   {
     fdcId: "200",
     name: "Broccoli, raw",
+    densityCategory: "vegetable_chopped",
     kcal: 34,
     protein: 2.82,
     carbs: 6.64,
@@ -46,13 +48,22 @@ afterAll(async () => {
 });
 
 describe("buildReferenceDb", () => {
-  it("writes every food with its macros", () => {
+  it("writes every food with its macros and density category", () => {
     const row = db
-      .prepare(`SELECT name, kcal, protein FROM foods WHERE id = '100'`)
-      .get() as { name: string; kcal: number; protein: number };
+      .prepare(
+        `SELECT name, density_category, kcal, protein FROM foods WHERE id = '100'`,
+      )
+      .get() as {
+      name: string;
+      density_category: string;
+      kcal: number;
+      protein: number;
+    };
 
     expect(row).toEqual({
       name: "Beans, black, boiled",
+      // Carried through so volume units can resolve on the device.
+      density_category: "legume_cooked",
       kcal: 132,
       protein: 8.86,
     });

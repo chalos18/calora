@@ -57,6 +57,21 @@ export interface DayView {
   entries: DiaryEntry[];
 }
 
+export interface FoodDetail {
+  id: string;
+  name: string;
+  brandName: string | null;
+  provenance: "usda" | "openfoodfacts" | "recipe" | "user";
+  densityCategory: string | null;
+  kcal: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  portions: { label: string; grams: number; source: string }[];
+  hasRecipe: boolean;
+  ingredients: string[];
+}
+
 export interface FoodSearchResult {
   id: string;
   name: string;
@@ -72,6 +87,8 @@ export interface FoodSearchResult {
 export const api = {
   getDay: (userId: string, date: string) =>
     request<DayView>(`/users/${userId}/days/${date}`),
+
+  getFood: (foodId: string) => request<FoodDetail>(`/foods/${foodId}`),
 
   searchFoods: (userId: string, query: string) =>
     request<{ results: FoodSearchResult[] }>(

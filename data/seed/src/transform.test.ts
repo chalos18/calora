@@ -104,12 +104,59 @@ describe("toSeedFoods", () => {
     expect(broccoli?.portions[0]?.label).toBe("1 cup chopped");
   });
 
+  it("infers a density category so volume units resolve", () => {
+    // Without this the density table is unreachable for every seeded food and
+    // asking for a cup of anything without a sourced portion just fails.
+    const beans = foods.find((f) => f.name === "Beans, black, boiled");
+    expect(beans?.densityCategory).toBe("legume_cooked");
+  });
+
+  it("leaves the density category unset when it cannot tell", () => {
+    const [mystery] = toSeedFoods({
+      foodRows: [
+        {
+          fdc_id: "500",
+          data_type: "sr_legacy_food",
+          description: "Unidentifiable substance",
+        },
+      ],
+      nutrientRows: [
+        { fdc_id: "500", nutrient_id: "1008", amount: "100" },
+        { fdc_id: "500", nutrient_id: "1003", amount: "5" },
+        { fdc_id: "500", nutrient_id: "1005", amount: "10" },
+        { fdc_id: "500", nutrient_id: "1004", amount: "1" },
+      ],
+      portionRows: [],
+    });
+
+    // Guessing a density would put an invented weight into a daily total.
+    expect(mystery?.densityCategory).toBeNull();
+  });
+
   it("skips foods with no energy value", () => {
     const result = toSeedFoods({
       foodRows: [
         { fdc_id: "400", data_type: "sr_legacy_food", description: "Mystery" },
       ],
       nutrientRows: [],
+      portionRows: [],
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it("skips a food missing any macro rather than seeding it as zero", () => {
+    // A fabricated zero would freeze onto Log Entries looking measured, and
+    // would be indistinguishable from a food that genuinely contains none.
+    const result = toSeedFoods({
+      foodRows: [
+        { fdc_id: "600", data_type: "sr_legacy_food", description: "Half known" },
+      ],
+      nutrientRows: [
+        { fdc_id: "600", nutrient_id: "1008", amount: "100" },
+        { fdc_id: "600", nutrient_id: "1003", amount: "5" },
+        // carbohydrate and fat are not reported
+      ],
       portionRows: [],
     });
 

@@ -1,3 +1,4 @@
+import { inferDensityCategory } from "./density-category.js";
 import {
   USDA_MACRO_IDS,
   USDA_NUTRIENT_MAP,
@@ -69,6 +70,7 @@ export interface SeedPortion {
 export interface SeedFood {
   fdcId: string;
   name: string;
+  densityCategory: string | null;
   kcal: number;
   protein: number;
   carbs: number;
@@ -135,9 +137,17 @@ export const toSeedFoods = ({
       }
     }
 
-    // Without energy there is nothing to log against; such rows are reference
-    // entries rather than foods.
-    if (macros.kcal === undefined) continue;
+    // A food is only usable if all four macros are reported. Defaulting an
+    // absent one to zero would seed the registry with a fabricated value that
+    // then freezes onto Log Entries as though it were measured.
+    if (
+      macros.kcal === undefined ||
+      macros.protein === undefined ||
+      macros.carbs === undefined ||
+      macros.fat === undefined
+    ) {
+      continue;
+    }
 
     const portions: SeedPortion[] = (portionsByFood.get(fdcId) ?? [])
       .map((row) => ({
@@ -150,10 +160,11 @@ export const toSeedFoods = ({
     foods.push({
       fdcId,
       name: foodRow.description ?? "",
+      densityCategory: inferDensityCategory(foodRow.description ?? ""),
       kcal: macros.kcal,
-      protein: macros.protein ?? 0,
-      carbs: macros.carbs ?? 0,
-      fat: macros.fat ?? 0,
+      protein: macros.protein,
+      carbs: macros.carbs,
+      fat: macros.fat,
       nutrients,
       portions,
     });

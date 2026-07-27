@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { rmSync } from "node:fs";
 import { KEPT_NUTRIENTS } from "./nutrient-map.js";
 import type { SeedFood } from "./transform.js";
 
@@ -20,6 +21,7 @@ CREATE TABLE nutrients (
 CREATE TABLE foods (
   id      TEXT PRIMARY KEY,
   name    TEXT NOT NULL,
+  density_category TEXT,
   kcal    REAL NOT NULL,
   protein REAL NOT NULL,
   carbs   REAL NOT NULL,
@@ -45,6 +47,10 @@ CREATE VIRTUAL TABLE foods_fts USING fts5(food_id UNINDEXED, name);
 `;
 
 export const buildReferenceDb = (path: string, foods: SeedFood[]): void => {
+  // Rebuilt from scratch each time: opening an existing file would fail on
+  // CREATE TABLE, and a partial overwrite would silently mix two releases.
+  rmSync(path, { force: true });
+
   const db = new Database(path);
 
   db.pragma("journal_mode = OFF");
@@ -54,8 +60,8 @@ export const buildReferenceDb = (path: string, foods: SeedFood[]): void => {
     `INSERT INTO nutrients (id, name, unit) VALUES (?, ?, ?)`,
   );
   const insertFood = db.prepare(
-    `INSERT INTO foods (id, name, kcal, protein, carbs, fat)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO foods (id, name, density_category, kcal, protein, carbs, fat)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
   const insertFoodNutrient = db.prepare(
     `INSERT OR IGNORE INTO food_nutrients (food_id, nutrient_id, amount)
@@ -77,6 +83,7 @@ export const buildReferenceDb = (path: string, foods: SeedFood[]): void => {
       insertFood.run(
         food.fdcId,
         food.name,
+        food.densityCategory,
         food.kcal,
         food.protein,
         food.carbs,

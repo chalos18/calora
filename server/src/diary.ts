@@ -1,4 +1,5 @@
 import {
+  isDensityCategory,
   resolveGrams,
   scaleMacrosToGrams,
   scaleNutrientsToGrams,
@@ -61,13 +62,18 @@ export const logFood = async (
     source: row.source,
   }));
 
+  // density_category is free text in the schema, so it is validated against the
+  // table rather than cast. An unrecognised value would otherwise multiply by
+  // undefined and store NaN grams and NaN calories.
+  const densityCategory = isDensityCategory(food.density_category)
+    ? food.density_category
+    : undefined;
+
   const resolved = resolveGrams({
     quantity: input.quantity,
     unit: input.unit,
     portions,
-    ...(food.density_category
-      ? { densityCategory: food.density_category as never }
-      : {}),
+    ...(densityCategory ? { densityCategory } : {}),
   });
 
   if (!resolved) return { error: "unresolvable_unit" };
@@ -97,41 +103,53 @@ export const logFood = async (
     resolved.grams,
   );
 
-  const { rows: inserted } = await db.query<{ id: string }>(
-    `INSERT INTO log_entries
-       (user_id, date, meal_slot, food_id, food_name, portion_label,
-        quantity, grams, is_estimated, kcal, protein, carbs, fat)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-     RETURNING id`,
-    [
-      input.userId,
-      input.date,
-      input.mealSlot,
-      food.id,
-      food.name,
-      input.unit,
-      input.quantity,
-      resolved.grams,
-      resolved.isEstimated,
-      macros.kcal,
-      macros.protein,
-      macros.carbs,
-      macros.fat,
-    ],
-  );
+  // The entry and its nutrients are one unit. A half-written entry would carry
+  // only some of its frozen nutrients, and coverage - computed from exactly
+  // that - would under-report forever, indistinguishable from a food whose
+  // data genuinely lacks them.
+  await db.query("BEGIN");
 
-  const logEntryId = inserted[0]!.id;
-
-  // Frozen under the same rule as the macro columns.
-  for (const [nutrientId, amount] of Object.entries(scaledNutrients)) {
-    await db.query(
-      `INSERT INTO log_entry_nutrients (log_entry_id, nutrient_id, amount)
-       VALUES ($1, $2, $3)`,
-      [logEntryId, nutrientId, amount],
+  try {
+    const { rows: inserted } = await db.query<{ id: string }>(
+      `INSERT INTO log_entries
+         (user_id, date, meal_slot, food_id, food_name, portion_label,
+          quantity, grams, is_estimated, kcal, protein, carbs, fat)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       RETURNING id`,
+      [
+        input.userId,
+        input.date,
+        input.mealSlot,
+        food.id,
+        food.name,
+        input.unit,
+        input.quantity,
+        resolved.grams,
+        resolved.isEstimated,
+        macros.kcal,
+        macros.protein,
+        macros.carbs,
+        macros.fat,
+      ],
     );
-  }
 
-  return { id: logEntryId };
+    const logEntryId = inserted[0]!.id;
+
+    // Frozen under the same rule as the macro columns.
+    for (const [nutrientId, amount] of Object.entries(scaledNutrients)) {
+      await db.query(
+        `INSERT INTO log_entry_nutrients (log_entry_id, nutrient_id, amount)
+         VALUES ($1, $2, $3)`,
+        [logEntryId, nutrientId, amount],
+      );
+    }
+
+    await db.query("COMMIT");
+    return { id: logEntryId };
+  } catch (cause) {
+    await db.query("ROLLBACK");
+    throw cause;
+  }
 };
 
 export interface DayTotals {

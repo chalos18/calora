@@ -111,6 +111,84 @@ describe("history immutability", () => {
   });
 });
 
+describe("when a food carries a density category", () => {
+  it("resolves a volume unit and marks the entry estimated", async () => {
+    await db.query(
+      `UPDATE foods SET density_category = 'milk' WHERE id = $1`,
+      [foodId],
+    );
+
+    await logFood(db, {
+      userId,
+      foodId,
+      date: DATE,
+      mealSlot: "breakfast",
+      quantity: 1,
+      unit: "cup",
+    });
+
+    const { rows } = await db.query<{ grams: string; is_estimated: boolean }>(
+      `SELECT grams, is_estimated FROM log_entries WHERE user_id = $1`,
+      [userId],
+    );
+
+    // 240 ml of milk at 1.03 g/ml
+    expect(Number(rows[0]?.grams)).toBe(247);
+    expect(rows[0]?.is_estimated).toBe(true);
+  });
+
+  it("refuses a category it does not recognise rather than storing NaN", async () => {
+    // density_category is free text in the schema, so a bad value must not
+    // reach the density table and produce NaN grams and NaN calories.
+    await db.query(
+      `UPDATE foods SET density_category = 'not_a_real_category' WHERE id = $1`,
+      [foodId],
+    );
+
+    const result = await logFood(db, {
+      userId,
+      foodId,
+      date: DATE,
+      mealSlot: "breakfast",
+      quantity: 1,
+      unit: "cup",
+    });
+
+    expect(result).toEqual({ error: "unresolvable_unit" });
+  });
+});
+
+describe("when writing a log entry fails partway", () => {
+  it("leaves no entry behind rather than one with partial nutrients", async () => {
+    // Coverage is computed from which nutrients a log entry carries, so an
+    // entry saved with only some of them would under-report coverage forever
+    // and look identical to a food that genuinely lacks the data.
+    const failingDb: Db = {
+      query: (sql, params) =>
+        sql.includes("INSERT INTO log_entry_nutrients")
+          ? Promise.reject(new Error("connection lost"))
+          : db.query(sql, params),
+    };
+
+    await expect(
+      logFood(failingDb, {
+        userId,
+        foodId,
+        date: DATE,
+        mealSlot: "breakfast",
+        quantity: 200,
+        unit: "g",
+      }),
+    ).rejects.toThrow();
+
+    const { rows } = await db.query<{ count: string }>(
+      `SELECT COUNT(*) AS count FROM log_entries WHERE user_id = $1`,
+      [userId],
+    );
+    expect(Number(rows[0]?.count)).toBe(0);
+  });
+});
+
 describe("coverage", () => {
   it("reports a nutrient as absent rather than zero when the food lacks it", async () => {
     const { rows } = await db.query<{ id: string }>(

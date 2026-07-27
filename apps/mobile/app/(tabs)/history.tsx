@@ -21,7 +21,10 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!userId) return;
-      void api.recentFoods(userId).then(({ foods: recent }) => setFoods(recent));
+      void api
+        .recentFoods(userId)
+        .then(({ foods: recent }) => setFoods(recent))
+        .catch(() => setFoods([]));
     }, [userId]),
   );
 

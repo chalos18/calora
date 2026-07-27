@@ -1,5 +1,6 @@
 export {
   DENSITY_G_PER_ML,
+  isDensityCategory,
   isVolumeUnit,
   VOLUME_UNIT_ML,
   type DensityCategory,

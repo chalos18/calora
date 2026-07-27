@@ -48,6 +48,8 @@ export default function SearchScreen() {
       try {
         const { results: found } = await api.searchFoods(userId, trimmed);
         setResults(found);
+      } catch {
+        setResults([]);
       } finally {
         setSearching(false);
       }

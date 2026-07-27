@@ -5,7 +5,12 @@
     "composite": false,
     "declaration": false,
     "declarationMap": false,
-    "types": ["node"]
+    "types": ["node"],
+    // Type-only import, erased at runtime, so no workspace link is needed -
+    // but typing the density rules against the real union catches typos.
+    "paths": {
+      "@calora/core": ["../../packages/core/src/index.ts"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts"]

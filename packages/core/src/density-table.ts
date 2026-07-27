@@ -49,3 +49,13 @@ export type VolumeUnit = keyof typeof VOLUME_UNIT_ML;
 
 export const isVolumeUnit = (unit: string): unit is VolumeUnit =>
   Object.hasOwn(VOLUME_UNIT_ML, unit);
+
+/**
+ * Density categories arrive from a free-text database column, so they are
+ * checked rather than cast. An unrecognised value must not reach the table and
+ * multiply by undefined.
+ */
+export const isDensityCategory = (
+  value: string | null | undefined,
+): value is DensityCategory =>
+  value !== null && value !== undefined && Object.hasOwn(DENSITY_G_PER_ML, value);

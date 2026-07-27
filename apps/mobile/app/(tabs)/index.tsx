@@ -47,7 +47,8 @@ export default function DiaryScreen() {
 
   const totals = day?.totals ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 };
   const goal = day?.goal ?? null;
-  const remaining = goal ? goal.kcal - totals.kcal : null;
+  // Computed by the server; not recomputed here, so there is one rule.
+  const remaining = day?.remaining ?? null;
 
   return (
     <ScrollView

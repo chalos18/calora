@@ -8,6 +8,7 @@ import {
   getRecentFoods,
   logFood,
 } from "./diary.js";
+import { getFood } from "./foods.js";
 import { getGoalOn, onboardUser } from "./onboarding.js";
 import { searchFoods } from "./search.js";
 
@@ -56,6 +57,13 @@ export const createApp = (db: Db) => {
     if (!userId) return c.json({ error: "userId_required" }, 400);
 
     return c.json({ results: await searchFoods(db, userId, query) });
+  });
+
+  // Registered after /foods/search: "search" is a valid-looking :id, and
+  // Hono matches in registration order.
+  app.get("/foods/:id", async (c) => {
+    const food = await getFood(db, c.req.param("id"));
+    return food ? c.json(food) : c.json({ error: "not_found" }, 404);
   });
 
   app.post("/log-entries", async (c) => {

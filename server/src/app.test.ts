@@ -60,6 +60,40 @@ describe("POST /onboarding", () => {
   });
 });
 
+describe("GET /foods", () => {
+  it("routes /foods/search to search, not to the food-by-id handler", async () => {
+    // "search" is a valid-looking :id, so ordering decides which wins.
+    const response = await app.request(`/foods/search?userId=${userId}&q=milk`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toHaveProperty("results");
+  });
+
+  it("returns a single food with its portions", async () => {
+    await db.query(
+      `INSERT INTO portions (food_id, label, grams, source)
+       VALUES ($1, 'cup', 244, 'usda')`,
+      [foodId],
+    );
+
+    const response = await app.request(`/foods/${foodId}`);
+    const body = (await response.json()) as {
+      name: string;
+      portions: { label: string }[];
+    };
+
+    expect(body.name).toBe("Whole milk");
+    expect(body.portions[0]?.label).toBe("cup");
+  });
+
+  it("404s for a food that does not exist", async () => {
+    const response = await app.request(
+      "/foods/00000000-0000-0000-0000-000000000000",
+    );
+    expect(response.status).toBe(404);
+  });
+});
+
 describe("GET /users/:userId/days/:date", () => {
   it("returns totals, the goal in force, and the diary", async () => {
     await post("/log-entries", {

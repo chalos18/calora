@@ -29,7 +29,7 @@ for (const n of nutrients) {
 
 const foods = reference
   .prepare(
-    `SELECT id, name, kcal, protein, carbs, fat FROM foods
+    `SELECT id, name, density_category, kcal, protein, carbs, fat FROM foods
       WHERE name LIKE 'Beans, black%' OR name LIKE 'Broccoli, raw%'
          OR name LIKE 'Rice, white, long-grain, regular, cooked%'
       LIMIT 6`,
@@ -37,6 +37,7 @@ const foods = reference
   .all() as {
   id: string;
   name: string;
+  density_category: string | null;
   kcal: number;
   protein: number;
   carbs: number;
@@ -47,9 +48,18 @@ const idMap = new Map<string, string>();
 
 for (const food of foods) {
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO foods (name, provenance, external_id, kcal, protein, carbs, fat)
-     VALUES ($1,'usda',$2,$3,$4,$5,$6) RETURNING id`,
-    [food.name, food.id, food.kcal, food.protein, food.carbs, food.fat],
+    `INSERT INTO foods (name, provenance, external_id, density_category,
+                        kcal, protein, carbs, fat)
+     VALUES ($1,'usda',$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [
+      food.name,
+      food.id,
+      food.density_category,
+      food.kcal,
+      food.protein,
+      food.carbs,
+      food.fat,
+    ],
   );
   const newId = rows[0]!.id;
   idMap.set(food.id, newId);
@@ -149,18 +159,45 @@ console.log(
     : "   HISTORY MOVED ✗",
 );
 
-// ---- 6. a unit that cannot be resolved ----
-const broccoli = search.results.find((r: any) => r.name.includes("Broccoli"));
-const bad = await post("/log-entries", {
+// ---- 6. density fallback, for a unit the food has no sourced portion for ----
+const broccoliId = (
+  await json(await app.request(`/foods/search?userId=${userId}&q=broccoli`))
+).results[0].id;
+
+await post("/log-entries", {
   userId,
-  foodId: (
-    await json(await app.request(`/foods/search?userId=${userId}&q=broccoli`))
-  ).results[0].id,
-  date: "2026-07-27",
+  foodId: broccoliId,
+  date: "2026-07-28",
   mealSlot: "lunch",
   quantity: 1,
   unit: "tbsp",
 });
-console.log(`\n6. logging 1 tbsp of broccoli → ${bad.status}`, await json(bad));
+
+const estimated = await json(
+  await app.request(`/users/${userId}/days/2026-07-28`),
+);
+const entry = estimated.entries[0];
+console.log(
+  `\n6. 1 tbsp of broccoli via the density table → ${entry.grams} g` +
+    `, isEstimated=${entry.isEstimated}`,
+);
+
+// ---- 7. a food with no density category is refused, not guessed ----
+const { rows: plain } = await db.query<{ id: string }>(
+  `INSERT INTO foods (name, provenance, kcal, protein, carbs, fat)
+   VALUES ('Mystery paste', 'user', 200, 5, 10, 15) RETURNING id`,
+);
+const refused = await post("/log-entries", {
+  userId,
+  foodId: plain[0]!.id,
+  date: "2026-07-28",
+  mealSlot: "lunch",
+  quantity: 1,
+  unit: "cup",
+});
+console.log(
+  `\n7. 1 cup of a food with no density category → ${refused.status}`,
+  await json(refused),
+);
 
 await db.close();
