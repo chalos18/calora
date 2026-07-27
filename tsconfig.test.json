@@ -12,5 +12,5 @@
       "@calora/core": ["./packages/core/src/index.ts"]
     }
   },
-  "include": ["packages/*/src/**/*.test.ts", "server/src/**/*.test.ts"]
+  "include": ["packages/*/src/**/*.test.ts", "server/src/**/*.test.ts", "data/seed/src/**/*.test.ts"]
 }

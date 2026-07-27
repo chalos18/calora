@@ -1,0 +1,9 @@
+{
+  "name": "@calora/seed",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "tsx src/index.ts"
+  }
+}
