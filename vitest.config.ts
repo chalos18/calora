@@ -15,6 +15,7 @@ export default defineConfig({
       "packages/*/src/**/*.test.ts",
       "server/src/**/*.test.ts",
       "data/seed/src/**/*.test.ts",
+      "apps/mobile/src/**/*.test.ts",
     ],
   },
 });

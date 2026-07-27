@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Calora",
+    "slug": "calora",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "calora",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "backgroundColor": "#1A1512",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#1A1512"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.calora.mobile"
+    },
+    "android": {
+      "package": "app.calora.mobile",
+      "adaptiveIcon": { "backgroundColor": "#1A1512" }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true }
+  }
+}
