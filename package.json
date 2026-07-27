@@ -8,13 +8,16 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke": "tsx scripts/smoke.mts",
-    "dev:api": "tsx server/src/dev.ts"
+    "dev:api": "tsx server/src/dev.ts",
+    "drive": "tsx scripts/drive.mts"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",
+    "@playwright/test": "^1.62.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.20.0",
+    "playwright": "^1.62.0",
     "tsx": "^4.23.1",
     "typescript": "^5.7.2",
     "vitest": "^3.0.5"
