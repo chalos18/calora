@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { z } from "zod";
 import type { Db } from "./db.js";
 import {
@@ -28,6 +29,30 @@ const onboardingSchema = z.object({
   goalType: z.enum(["lose", "maintain", "gain", "build_muscle"]),
 });
 
+/**
+ * Turn Zod issues into a field -> message map.
+ *
+ * The client renders each message against the input it belongs to, so a flat
+ * list of issues is not enough - the field name has to survive.
+ */
+const fieldErrors = (error: z.ZodError): Record<string, string> => {
+  const fields: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const field = issue.path[0];
+    if (typeof field === "string" && !(field in fields)) {
+      fields[field] = issue.message;
+    }
+  }
+  return fields;
+};
+
+/** Postgres unique-constraint violation. */
+const isUniqueViolation = (cause: unknown): boolean =>
+  typeof cause === "object" &&
+  cause !== null &&
+  "code" in cause &&
+  (cause as { code?: string }).code === "23505";
+
 const logEntrySchema = z.object({
   userId: z.uuid(),
   foodId: z.uuid(),
@@ -37,18 +62,54 @@ const logEntrySchema = z.object({
   unit: z.string().min(1),
 });
 
-export const createApp = (db: Db) => {
+export interface AppOptions {
+  /**
+   * Allow requests from another origin. Needed in development, where the Expo
+   * web client is served from :8081 while this API listens on :3000, so the
+   * browser sends a preflight OPTIONS before every POST.
+   *
+   * Off by default: production serves both from one origin, and a permissive
+   * default would be a security decision made by accident.
+   */
+  allowCrossOrigin?: boolean;
+}
+
+export const createApp = (db: Db, options: AppOptions = {}) => {
   const app = new Hono();
+
+  // Registered before any route: Hono applies middleware in registration
+  // order, so mounting this afterwards silently does nothing.
+  if (options.allowCrossOrigin) {
+    app.use("*", cors());
+  }
 
   app.get("/health", (c) => c.json({ ok: true }));
 
   app.post("/onboarding", async (c) => {
     const parsed = onboardingSchema.safeParse(await c.req.json());
     if (!parsed.success) {
-      return c.json({ error: "invalid_input", detail: parsed.error.issues }, 400);
+      return c.json(
+        { error: "invalid_input", fields: fieldErrors(parsed.error) },
+        400,
+      );
     }
 
-    return c.json(await onboardUser(db, parsed.data), 201);
+    try {
+      return c.json(await onboardUser(db, parsed.data), 201);
+    } catch (cause) {
+      if (isUniqueViolation(cause)) {
+        return c.json(
+          {
+            error: "email_taken",
+            fields: {
+              email: "That email is already registered on this Calora.",
+            },
+          },
+          409,
+        );
+      }
+      throw cause;
+    }
   });
 
   app.get("/foods/search", async (c) => {
@@ -69,7 +130,10 @@ export const createApp = (db: Db) => {
   app.post("/log-entries", async (c) => {
     const parsed = logEntrySchema.safeParse(await c.req.json());
     if (!parsed.success) {
-      return c.json({ error: "invalid_input", detail: parsed.error.issues }, 400);
+      return c.json(
+        { error: "invalid_input", fields: fieldErrors(parsed.error) },
+        400,
+      );
     }
 
     const result = await logFood(db, parsed.data);

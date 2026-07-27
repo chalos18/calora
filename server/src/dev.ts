@@ -10,7 +10,6 @@
  */
 import { PGlite } from "@electric-sql/pglite";
 import { serve } from "@hono/node-server";
-import { cors } from "hono/cors";
 import Database from "better-sqlite3";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -168,9 +167,8 @@ const db: Db = {
   query: async (sql, params) => pglite.query(sql, params as unknown[]) as never,
 };
 
-const app = createApp(db);
-// The Expo web client runs on a different port in development.
-app.use("*", cors());
+// The Expo web client is served from a different port in development.
+const app = createApp(db, { allowCrossOrigin: true });
 
 const port = Number(process.env.PORT ?? 3000);
 

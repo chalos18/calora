@@ -58,6 +58,83 @@ describe("POST /onboarding", () => {
 
     expect(response.status).toBe(400);
   });
+
+  it("names the offending field when validation fails", async () => {
+    // The client shows messages against the input they belong to, so the
+    // response has to say which field each problem is about.
+    const response = await post("/onboarding", {
+      email: "not-an-email",
+      sexAtBirth: "female",
+      birthDate: "1996-01-15",
+      heightCm: 165,
+      weightKg: 60,
+      activityLevel: "moderate",
+      goalType: "lose",
+    });
+
+    const body = (await response.json()) as { fields?: Record<string, string> };
+    expect(body.fields?.email).toBeTypeOf("string");
+  });
+
+  it("explains a duplicate email instead of failing opaquely", async () => {
+    const body = {
+      email: "taken@calora.local",
+      sexAtBirth: "female",
+      birthDate: "1996-01-15",
+      heightCm: 165,
+      weightKg: 60,
+      activityLevel: "moderate",
+      goalType: "lose",
+    };
+
+    expect((await post("/onboarding", body)).status).toBe(201);
+
+    // Previously a unique-constraint violation escaped as a bare 500, which
+    // told the user nothing and pointed at no field.
+    const repeat = await post("/onboarding", body);
+    expect(repeat.status).toBe(409);
+
+    const repeatBody = (await repeat.json()) as { fields?: Record<string, string> };
+    expect(repeatBody.fields?.email).toContain("already");
+  });
+});
+
+describe("cross-origin access", () => {
+  it("is refused by default", async () => {
+    const response = await app.request("/health", {
+      headers: { origin: "http://localhost:8081" },
+    });
+
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("is allowed when enabled, so the web client on another port can call it", async () => {
+    const permissive = createApp(db, { allowCrossOrigin: true });
+
+    const response = await permissive.request("/health", {
+      headers: { origin: "http://localhost:8081" },
+    });
+
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("answers the preflight the browser sends before a POST", async () => {
+    // The failing case: Chrome sends OPTIONS before POST /onboarding, and a
+    // response without the header aborts the request before it is ever sent.
+    const permissive = createApp(db, { allowCrossOrigin: true });
+
+    const response = await permissive.request("/onboarding", {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:8081",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type",
+      },
+    });
+
+    expect(response.status).toBeLessThan(400);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+  });
 });
 
 describe("GET /foods", () => {
