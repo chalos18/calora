@@ -4,13 +4,21 @@
   "type": "module",
   "packageManager": "pnpm@11.1.3",
   "scripts": {
-    "typecheck": "tsc --build --verbose",
+    "typecheck": "tsc --build && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@types/node": "^22.10.2",
+    "@types/pg": "^8.20.0",
     "typescript": "^5.7.2",
     "vitest": "^3.0.5"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.11",
+    "hono": "^4.12.32",
+    "pg": "^8.22.0",
+    "zod": "^4.4.3"
   }
 }

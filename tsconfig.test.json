@@ -1,0 +1,16 @@
+// Test files are excluded from the build (they must not reach dist), so they
+// are typechecked separately here rather than going unchecked.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@calora/core": ["./packages/core/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.test.ts", "server/src/**/*.test.ts"]
+}

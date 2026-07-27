@@ -44,6 +44,8 @@ export {
   type RankableFood,
 } from "./ranking.js";
 
+export { textMatchScore } from "./text-score.js";
+
 export {
   ACTIVITY_FACTORS,
   calculateBmr,

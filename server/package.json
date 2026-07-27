@@ -1,0 +1,14 @@
+{
+  "name": "@calora/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "node --experimental-strip-types src/index.ts"
+  },
+  "dependencies": {
+    "@calora/core": "workspace:*"
+  }
+}
