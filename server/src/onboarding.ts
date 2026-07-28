@@ -9,6 +9,11 @@ import {
 import type { Db } from "./db.js";
 
 export interface OnboardingInput {
+  /**
+   * Normally left out so Postgres generates one. Supplied only for accounts
+   * that need a stable id across database resets, such as the demo account.
+   */
+  userId?: string;
   email: string;
   sexAtBirth: SexAtBirth;
   birthDate: string;
@@ -31,7 +36,19 @@ export const ageInYears = (birthDate: string, on: Date): number => {
   return age;
 };
 
-const isoDate = (date: Date): string => date.toISOString().slice(0, 10);
+export const isoDate = (date: Date): string => date.toISOString().slice(0, 10);
+
+/**
+ * Emails are stored lowercased.
+ *
+ * Sign-in matches case-insensitively, so if the stored form kept its case,
+ * `Ana@calora.local` and `ana@calora.local` would satisfy the UNIQUE
+ * constraint as two separate accounts and sign-in would return whichever
+ * Postgres happened to hand back first. Normalising on the way in makes the
+ * existing constraint do the work.
+ */
+export const normaliseEmail = (email: string): string =>
+  email.trim().toLowerCase();
 
 /**
  * Create a user, record their starting weight, and derive their first Goal.
@@ -47,12 +64,13 @@ export const onboardUser = async (
   const today = input.today ?? new Date();
 
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO users (email, sex_at_birth, birth_date, height_cm,
+    `INSERT INTO users (id, email, sex_at_birth, birth_date, height_cm,
                         activity_level, goal_type)
-     VALUES ($1, $2, $3, $4, $5, $6)
+     VALUES (COALESCE($1::uuid, gen_random_uuid()), $2, $3, $4, $5, $6, $7)
      RETURNING id`,
     [
-      input.email,
+      input.userId ?? null,
+      normaliseEmail(input.email),
       input.sexAtBirth,
       input.birthDate,
       input.heightCm,

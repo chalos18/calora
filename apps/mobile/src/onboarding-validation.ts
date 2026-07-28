@@ -1,4 +1,5 @@
 import { dateInputPlaceholder, parseDateInput } from "./date-input";
+import { validateEmail } from "./email";
 
 export interface OnboardingFields {
   email: string;
@@ -53,11 +54,9 @@ export const validateOnboarding = (
 ): OnboardingErrors => {
   const errors: OnboardingErrors = {};
 
-  if (fields.email.trim() === "") {
-    errors.email = "Enter your email address.";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())) {
-    errors.email = "That does not look like an email address.";
-  }
+  // Shared with the login form, so an address accepted here is accepted there.
+  const emailError = validateEmail(fields.email);
+  if (emailError) errors.email = emailError;
 
   if (fields.birthDate.trim() === "") {
     errors.birthDate = "Enter your date of birth.";

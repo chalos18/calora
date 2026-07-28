@@ -23,8 +23,7 @@ export const createTestDb = async (): Promise<Db & { close(): Promise<void> }> =
   );
 
   return {
-    query: async (sql, params) =>
-      pglite.query(sql, params as unknown[]) as never,
+    query: (sql, params) => pglite.query(sql, params as unknown[]) as never,
     close: () => pglite.close(),
   };
 };

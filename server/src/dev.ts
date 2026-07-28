@@ -14,6 +14,7 @@ import Database from "better-sqlite3";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { DEMO_ACCOUNT, ensureDemoAccount } from "./accounts.js";
 import { createApp } from "./app.js";
 import type { Db } from "./db.js";
 
@@ -164,15 +165,29 @@ if (await alreadySeeded()) {
 }
 
 const db: Db = {
-  query: async (sql, params) => pglite.query(sql, params as unknown[]) as never,
+  query: (sql, params) => pglite.query(sql, params as unknown[]) as never,
 };
+
+// So the app can be opened without filling in onboarding first. Idempotent:
+// anything already logged against it survives a restart.
+await ensureDemoAccount(db);
 
 // The Expo web client is served from a different port in development.
 const app = createApp(db, { allowCrossOrigin: true });
 
 const port = Number(process.env.PORT ?? 3000);
 
+// Printed on boot because the sign-in screen asks for an email and there is
+// otherwise no way to remember which one you onboarded with.
+const { rows: accounts } = await db.query<{ email: string }>(
+  "SELECT email FROM users ORDER BY created_at",
+);
+
 serve({ fetch: app.fetch, port }, () => {
   console.log(`\nCalora dev API on http://localhost:${port}`);
+  console.log(`Test account:     ${DEMO_ACCOUNT.email}  (no password)`);
+  console.log(
+    `Accounts here:    ${accounts.map((a) => a.email).join(", ")}`,
+  );
   console.log("Now run the app:  cd apps/mobile && pnpm web\n");
 });

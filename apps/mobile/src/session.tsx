@@ -9,6 +9,12 @@ import {
 
 const STORAGE_KEY = "calora.userId";
 
+// A storage failure is not worth surfacing: the session still works for as
+// long as the app is open, and the cost is signing in again next launch.
+const ignoreStorageFailure = () => {
+  // Deliberately nothing.
+};
+
 /**
  * Who is using the app.
  *
@@ -24,6 +30,8 @@ interface Session {
   /** False until the stored id has been read; screens wait rather than flash. */
   isReady: boolean;
   setUserId: (userId: string) => void;
+  /** Forget who is using the app, returning it to the login screen. */
+  signOut: () => void;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -57,11 +65,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   const setUserId = (next: string) => {
     setUserIdState(next);
-    void AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
+    void AsyncStorage.setItem(STORAGE_KEY, next).catch(ignoreStorageFailure);
+  };
+
+  const signOut = () => {
+    setUserIdState(null);
+    void AsyncStorage.removeItem(STORAGE_KEY).catch(ignoreStorageFailure);
   };
 
   return (
-    <SessionContext.Provider value={{ userId, isReady, setUserId }}>
+    <SessionContext.Provider value={{ userId, isReady, setUserId, signOut }}>
       {children}
     </SessionContext.Provider>
   );

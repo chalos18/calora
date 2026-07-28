@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
+import { findAccountByEmail } from "./accounts.js";
 import type { Db } from "./db.js";
 import {
   deleteLogEntry,
@@ -13,8 +14,15 @@ import { getFood } from "./foods.js";
 import { getGoalOn, onboardUser } from "./onboarding.js";
 import { searchFoods } from "./search.js";
 
+/**
+ * Trimmed before it is validated, so a body with a padded address is a valid
+ * address rather than an `invalid_input` the caller cannot see the cause of.
+ * The app trims already; curl and the driving script do not.
+ */
+const emailField = z.string().trim().pipe(z.email());
+
 const onboardingSchema = z.object({
-  email: z.email(),
+  email: emailField,
   sexAtBirth: z.enum(["male", "female"]),
   birthDate: z.iso.date(),
   heightCm: z.number().positive(),
@@ -52,6 +60,8 @@ const isUniqueViolation = (cause: unknown): boolean =>
   cause !== null &&
   "code" in cause &&
   (cause as { code?: string }).code === "23505";
+
+const loginSchema = z.object({ email: emailField });
 
 const logEntrySchema = z.object({
   userId: z.uuid(),
@@ -110,6 +120,32 @@ export const createApp = (db: Db, options: AppOptions = {}) => {
       }
       throw cause;
     }
+  });
+
+  // Signing back in. Email only, no credential - see docs/adr/0010.
+  app.post("/login", async (c) => {
+    const parsed = loginSchema.safeParse(await c.req.json());
+    if (!parsed.success) {
+      return c.json(
+        { error: "invalid_input", fields: fieldErrors(parsed.error) },
+        400,
+      );
+    }
+
+    const account = await findAccountByEmail(db, parsed.data.email);
+    if (!account) {
+      return c.json(
+        {
+          error: "account_not_found",
+          fields: {
+            email: "No Calora account uses that email. Create one instead?",
+          },
+        },
+        404,
+      );
+    }
+
+    return c.json(account);
   });
 
   app.get("/foods/search", async (c) => {

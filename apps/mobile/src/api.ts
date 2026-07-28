@@ -141,6 +141,13 @@ export const api = {
   deleteLogEntry: (userId: string, id: string) =>
     request<void>(`/log-entries/${id}?userId=${userId}`, { method: "DELETE" }),
 
+  /** Sign back in to an account that already exists. Email only, no password. */
+  login: (email: string) =>
+    request<{ userId: string; goal: MacroTargets | null }>("/login", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
   onboard: (body: {
     email: string;
     sexAtBirth: "male" | "female";

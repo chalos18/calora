@@ -18,7 +18,7 @@ import { useSession } from "../../src/session";
 import { MEAL_SLOTS, theme } from "../../src/theme";
 
 export default function DiaryScreen() {
-  const { userId, isReady } = useSession();
+  const { userId, isReady, signOut } = useSession();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -44,7 +44,7 @@ export default function DiaryScreen() {
   );
 
   // Wait for the stored session before deciding; redirecting on first paint
-  // would bounce a returning user back through onboarding.
+  // would bounce a returning user back out to the login screen.
   if (!isReady) {
     return (
       <View style={styles.booting}>
@@ -53,7 +53,9 @@ export default function DiaryScreen() {
     );
   }
 
-  if (!userId) return <Redirect href="/onboarding" />;
+  // Signing in, not onboarding: someone without a session usually already has
+  // an account, and onboarding would only hand them a second one.
+  if (!userId) return <Redirect href="/login" />;
 
   const totals = day?.totals ?? { kcal: 0, protein: 0, carbs: 0, fat: 0 };
   const goal = day?.goal ?? null;
@@ -71,10 +73,9 @@ export default function DiaryScreen() {
         <RefreshControl
           refreshing={refreshing}
           tintColor={theme.colour.textMuted}
-          onRefresh={async () => {
+          onRefresh={() => {
             setRefreshing(true);
-            await load();
-            setRefreshing(false);
+            void load().then(() => setRefreshing(false));
           }}
         />
       }
@@ -187,9 +188,11 @@ export default function DiaryScreen() {
                 <Pressable
                   key={entry.id}
                   style={styles.entry}
-                  onLongPress={async () => {
-                    await api.deleteLogEntry(userId, entry.id);
-                    await load();
+                  onLongPress={() => {
+                    void (async () => {
+                      await api.deleteLogEntry(userId, entry.id);
+                      await load();
+                    })();
                   }}
                 >
                   <View style={styles.entryText}>
@@ -214,6 +217,10 @@ export default function DiaryScreen() {
         onPress={() => router.push(`/search?date=${date}`)}
         style={styles.logButton}
       />
+
+      {/* Nothing is lost by signing out: the account and its diary stay on the
+          server, and the same email brings them back. */}
+      <RoundButton label="Sign out" variant="quiet" onPress={signOut} />
     </ScrollView>
   );
 }
