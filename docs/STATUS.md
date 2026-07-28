@@ -1,29 +1,11 @@
 # Calora — where the build is up to
 
-Written 27 July 2026. Companion to the plan at
+Last updated 28 July 2026. Companion to the plan at
 `~/.claude/plans/you-are-a-software-quiet-whistle.md`, which holds the full
 reasoning behind decisions D1–D19 and milestones M1–M9.
 
----
-
-## Two codebases exist
-
-This is the most important thing on the page.
-
-| | `~/workspace/calora` (this repo) | `~/workspace/calora-api` |
-|---|---|---|
-| Stack | Hono + PGlite/Postgres, Expo monorepo | NestJS + Prisma |
-| Scope | Server **and** mobile/web app | API only |
-| Built by | This session, from the plan | Earlier, separately |
-| Tests | 146 | its own |
-| Git | 5 commits | 3 commits |
-
-**They are unrelated.** Nothing in this repo talks to `calora-api`, and
-`pnpm dev:api` exists only here — which is why it wasn't found in `calora-api`.
-Its equivalent there is `start:dev`.
-
-Nothing has been done to reconcile them, because which one survives is not a
-call to make silently. See "Open question" at the bottom.
+Stack: Hono over PGlite/Postgres for the server, Expo for iOS, Android and web,
+in one monorepo. 159 tests.
 
 ---
 
@@ -34,10 +16,11 @@ call to make silently. See "Open question" at the bottom.
 | Piece | State |
 |---|---|
 | Monorepo, TypeScript, vitest | done |
-| `CONTEXT.md` glossary, 9 ADRs | done |
+| `CONTEXT.md` glossary, 10 ADRs | done |
 | Postgres schema, incl. nutrient tables + empty `Insight` | done |
 | USDA seed → `reference.sqlite` (7,928 foods, 10 MB) | done |
 | Onboarding → TDEE → protein-first targets | done |
+| Sign in to an existing account; sign out | done, beyond plan |
 | Home screen: donut, day navigation, macro bars | done |
 | Search with history/provenance/text ranking | done |
 | Food detail sheet: portions, macro table, provenance, ingredients | done |
@@ -56,6 +39,9 @@ call to make silently. See "Open question" at the bottom.
 3. **Ranking is a weighted sum**, not the strict precedence D12 describes. A
    stale single log can lose to a well-sourced match. Arguably better; it is
    simply not what was written down.
+4. **Sign-in has no credential.** `POST /login` takes an email and returns that
+   account. Deliberate and documented in `docs/adr/0010`, but it is the thing
+   that must be fixed before Calora is hosted for anyone but its author.
 
 ### M2–M9 — not started
 
@@ -95,6 +81,10 @@ Found by code review, then by driving the app in a real browser:
 - **Duplicate email** surfaced as a bare 500.
 - Session was in-memory, so a page reload dropped you back into onboarding.
 - Invalid `transform-origin` DOM property from the donut's SVG.
+- **Onboarding was the landing screen**, so anyone whose stored session had gone
+  — a new browser, cleared storage, a reinstall — had no route back to their own
+  account and could only create a second one under a different email. Sign-in is
+  now the landing screen and onboarding branches off it.
 
 ---
 
@@ -114,25 +104,17 @@ FTS5 locally, per D10 in the plan
 ```
 
 Read first, in this order: `CONTEXT.md` for vocabulary, then the ADR covering
-the area. `docs/adr/0003` and `0009` describe decisions that look like mistakes
-without their reasoning and should not be "fixed" casually.
+the area. `docs/adr/0003`, `0009` and `0010` describe decisions that look like
+mistakes without their reasoning and should not be "fixed" casually.
 
 Before starting: `pnpm test`, `pnpm typecheck`, `pnpm smoke` should all pass.
 That is the baseline any change has to keep.
 
----
+To open the app without filling anything in, tap **Use the test account** on the
+sign-in screen — the dev server keeps `demo@calora.local` pre-onboarded and
+idempotent, so whatever you logged into it last time is still there.
 
-## Open question
-
-**Which codebase continues — this one or `calora-api`?**
-
-They implement overlapping scope in different stacks. Options as I see them:
-
-1. **Keep `calora`, retire `calora-api`.** It has the app, the domain docs, the
-   seed pipeline and 146 tests, and the plan was written against it.
-2. **Keep `calora-api` for the server, keep `calora`'s app.** Means porting the
-   schema, ranking, portion resolution and snapshot rules into NestJS/Prisma,
-   and re-proving the invariants there.
-3. **Keep both deliberately**, for different purposes.
-
-Nothing should be merged or deleted until you decide.
+`pnpm lint` does **not** pass. `eslint.config.js` is newly added and the repo
+has 11 pre-existing violations under it, in six files — mostly
+`no-misused-promises` on `onPress` handlers, and `any` flowing through
+`scripts/smoke.mts`. None are in the sign-in code. Worth a pass of its own.
