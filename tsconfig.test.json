@@ -12,5 +12,11 @@
       "@calora/core": ["./packages/core/src/index.ts"]
     }
   },
-  "include": ["packages/*/src/**/*.test.ts", "server/src/**/*.test.ts", "data/seed/src/**/*.test.ts"]
+  "include": [
+    "packages/*/src/**/*.test.ts",
+    "server/src/**/*.test.ts",
+    "data/seed/src/**/*.test.ts"
+    // The mobile app's tests are checked by apps/mobile/tsconfig.json, which
+    // has the bundler resolution they need.
+  ]
 }

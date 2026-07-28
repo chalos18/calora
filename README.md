@@ -6,8 +6,8 @@ calorie and macronutrient goals derived from your body and your objective.
 Mobile-first (iOS, Android) with a web companion, from one Expo codebase.
 
 - [`CONTEXT.md`](./CONTEXT.md) — the glossary. Read this before naming anything.
-- [`docs/adr/`](./docs/adr/) — nine decisions, several of which look like
-  mistakes without the reasoning. Read `0001`, `0003` and `0009` before
+- [`docs/adr/`](./docs/adr/) — ten decisions, several of which look like
+  mistakes without the reasoning. Read `0001`, `0003`, `0009` and `0010` before
   "fixing" what they describe.
 
 ## Running it
@@ -21,21 +21,36 @@ pnpm install
 # One-off: build the food registry (~90s, downloads ~10 MB from USDA).
 cd data/seed && pnpm seed && cd ../..
 
-# Terminal 1 — API on :3000. First run seeds 7,928 foods, ~9s.
-pnpm dev:api
-
-# Terminal 2 — the app.
-cd apps/mobile
-pnpm web        # browser
-pnpm android    # Android emulator, see below
-pnpm ios        # iOS simulator (macOS only)
+# API on :3000 plus the app, in one terminal. First run seeds 7,928 foods, ~9s.
+pnpm dev            # asks: web, android or ios
+pnpm dev web        # browser
+pnpm dev android    # Android emulator, see below
+pnpm dev ios        # iOS simulator (macOS only)
 ```
 
-Open http://localhost:8081. You will land on onboarding: fill it in and it
-works out your calorie and macro targets, then drops you on the diary.
+`pnpm dev` waits for the API to answer `/health` before starting the app, and
+points the app at the right host for the target — `10.0.2.2` on Android, where
+`localhost` is the emulator itself. Ctrl-C stops both; if either half dies it
+takes the other with it. Setting `EXPO_PUBLIC_API_URL` overrides the host (a
+physical phone on the LAN). The halves still run on their own if you want them
+in separate terminals: `pnpm dev:api`, and `pnpm web` in `apps/mobile`.
 
-Everything you log persists to `server/.dev-data`. Delete that directory to
-start over.
+Open http://localhost:8081. You land on **sign in**. Three ways forward:
+
+- **Use the test account** — one tap. The dev server creates
+  `demo@calora.local`, already onboarded, on every boot. Nothing to fill in.
+- **Your own email**, if you have onboarded before. Everything comes back:
+  goals, diary, history. The dev server prints every account it holds on boot,
+  in case you have forgotten which address you used.
+- **Set up your goals** — onboarding, for a new account.
+
+There is no password. Calora has no credentials yet and must not be hosted for
+more than one person until it does; see
+[`docs/adr/0010`](./docs/adr/0010-signing-in-with-an-email-and-no-credential.md).
+
+Everything you log persists to `server/.dev-data`, including your account, so
+signing out and back in loses nothing. Delete that directory to start over —
+the test account is recreated, your own is not.
 
 ### On an Android emulator
 
@@ -66,10 +81,7 @@ Then, per session:
 
 ```bash
 emulator -avd calora &
-
-# The emulator maps the host to 10.0.2.2; localhost is the emulator itself.
-cd apps/mobile
-EXPO_PUBLIC_API_URL=http://10.0.2.2:3000 pnpm android
+pnpm dev android
 ```
 
 The first build takes several minutes; later ones are incremental. After it is
@@ -108,16 +120,18 @@ design turns on:
 ## Verifying it
 
 ```bash
-pnpm test        # 146 tests
+pnpm test        # 159 tests
 pnpm typecheck   # four projects
 pnpm smoke       # end-to-end against real USDA data
 pnpm drive       # drives the running app in a real browser, screenshots it
 ```
 
-`pnpm drive` needs both servers up. It walks onboarding, submits the form
-empty to check every field reports its own error, submits a malformed date,
-completes the flow, re-submits a duplicate email, then searches and opens a
-food — screenshotting each step to `/tmp/calora-shots`.
+`pnpm drive` needs both servers up. It signs in with an unknown email, signs in
+with the test account, walks onboarding — submitting the form empty to check
+every field reports its own error, then a malformed date — completes it, signs
+out and signs back in to check the account and its goal come back, re-submits a
+duplicate email, then searches and opens a food, screenshotting each step to
+`/tmp/calora-shots`.
 
 `pnpm smoke` runs the real server and asserts the things that would otherwise
 fail silently: that a cup of black beans resolves to 194 g from a sourced
@@ -140,11 +154,7 @@ data/seed/       USDA → reference.sqlite, the bundled offline registry
 See [`docs/STATUS.md`](./docs/STATUS.md) — what is built, what is not, the
 known gaps, and how to pick the work back up.
 
-In short: the core logging loop (M1) works end to end. Barcode scanning, recipe
-import, plate photos, micronutrients, the nutritionist agent and the
-transparency surface are not started. Offline search is the one M1 commitment
-still outstanding.
-
-Note there is a **separate** `~/workspace/calora-api` project (NestJS + Prisma)
-covering overlapping scope. It is unrelated to this repo. `STATUS.md` sets out
-the choice between them.
+In short: the core logging loop (M1) works end to end, and you can sign back
+into an account you already have. Barcode scanning, recipe import, plate
+photos, micronutrients, the nutritionist agent and the transparency surface are
+not started. Offline search is the one M1 commitment still outstanding.

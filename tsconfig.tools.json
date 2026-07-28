@@ -1,0 +1,18 @@
+// The scripts and configs at the repo root belong to no package, so without
+// this file they are checked by nothing and the linter sees them as untyped.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    // drive.mts passes callbacks to page.evaluate, which run in the browser.
+    "lib": ["ES2023", "DOM"],
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node"],
+    "paths": {
+      "@calora/core": ["./packages/core/src/index.ts"]
+    }
+  },
+  "include": ["scripts/**/*.mts", "vitest.config.ts"]
+}

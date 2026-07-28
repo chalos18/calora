@@ -16,5 +16,8 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ],
-  "exclude": ["node_modules", "src/**/*.test.ts"]
+  // Tests are checked here rather than by the root tsconfig.test.json: they
+  // import app modules, which resolve under Expo's bundler resolution and not
+  // under the NodeNext the rest of the repo uses.
+  "exclude": ["node_modules"]
 }
