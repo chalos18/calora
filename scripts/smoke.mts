@@ -9,6 +9,23 @@ import { createTestDb } from "../server/src/test-db.ts";
 const db = await createTestDb();
 const app = createApp(db);
 
+/**
+ * The two days this script logs into.
+ *
+ * Derived from the clock rather than written down: a Goal is dated from the day
+ * it is created, and `getGoalOn` only returns one whose `effective_from` is on
+ * or before the day being read. Hardcoded dates worked until the calendar
+ * passed them, and then every day came back with a null goal.
+ */
+const isoDay = (offset: number): string => {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+};
+
+const DAY_ONE = isoDay(0);
+const DAY_TWO = isoDay(1);
+
 // ---- load a handful of genuine USDA foods out of the built reference DB ----
 const reference = new Database(
   "/home/anaoliveira/workspace/calora/data/seed/reference.sqlite",
@@ -115,6 +132,15 @@ const onboarded = await json(
 const userId = onboarded.userId as string;
 console.log("1. onboarding →", onboarded.goal);
 
+// Signing back in has to return the same account and the same goal, or a
+// returning user quietly gets a second, empty diary.
+const loggedIn = await json(await post("/login", { email: "ANA@calora.local" }));
+console.log(
+  loggedIn.userId === userId && loggedIn.goal.kcal === onboarded.goal.kcal
+    ? "   sign back in (different case) → same account, same goal ✓"
+    : "   SIGN-IN RETURNED A DIFFERENT ACCOUNT OR GOAL ✗",
+);
+
 // ---- 2. search ----
 const search = await json(
   await app.request(`/foods/search?userId=${userId}&q=black%20beans`),
@@ -131,7 +157,7 @@ const logged = await json(
   await post("/log-entries", {
     userId,
     foodId: beans.id,
-    date: "2026-07-27",
+    date: DAY_ONE,
     mealSlot: "dinner",
     quantity: 1,
     unit: "cup",
@@ -140,7 +166,7 @@ const logged = await json(
 console.log(`\n3. logged 1 cup of "${beans.name}" → entry ${logged.id.slice(0, 8)}`);
 
 // ---- 4. read the day back ----
-const day = await json(await app.request(`/users/${userId}/days/2026-07-27`));
+const day = await json(await app.request(`/users/${userId}/days/${DAY_ONE}`));
 console.log("\n4. day view →");
 console.log("   totals   ", day.totals);
 console.log("   goal     ", day.goal.kcal, "kcal");
@@ -149,7 +175,7 @@ console.log("   entry    ", day.entries[0].foodName, `${day.entries[0].grams} g`
 
 // ---- 5. immutability under a correction ----
 await db.query(`UPDATE foods SET kcal = 9999 WHERE id = $1`, [beans.id]);
-const after = await json(await app.request(`/users/${userId}/days/2026-07-27`));
+const after = await json(await app.request(`/users/${userId}/days/${DAY_ONE}`));
 console.log(
   `\n5. after corrupting the food to 9999 kcal/100g → day still reads ${after.totals.kcal} kcal`,
 );
@@ -167,14 +193,14 @@ const broccoliId = (
 await post("/log-entries", {
   userId,
   foodId: broccoliId,
-  date: "2026-07-28",
+  date: DAY_TWO,
   mealSlot: "lunch",
   quantity: 1,
   unit: "tbsp",
 });
 
 const estimated = await json(
-  await app.request(`/users/${userId}/days/2026-07-28`),
+  await app.request(`/users/${userId}/days/${DAY_TWO}`),
 );
 const entry = estimated.entries[0];
 console.log(
@@ -190,7 +216,7 @@ const { rows: plain } = await db.query<{ id: string }>(
 const refused = await post("/log-entries", {
   userId,
   foodId: plain[0]!.id,
-  date: "2026-07-28",
+  date: DAY_TWO,
   mealSlot: "lunch",
   quantity: 1,
   unit: "cup",

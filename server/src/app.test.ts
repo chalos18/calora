@@ -99,6 +99,53 @@ describe("POST /onboarding", () => {
   });
 });
 
+describe("POST /login", () => {
+  it("returns the existing user and their current goal", async () => {
+    const created = (await (
+      await post("/onboarding", {
+        email: "returning@calora.local",
+        sexAtBirth: "female",
+        birthDate: "1996-01-15",
+        heightCm: 165,
+        weightKg: 60,
+        activityLevel: "moderate",
+        goalType: "lose",
+      })
+    ).json()) as { userId: string; goal: { kcal: number } };
+
+    const response = await post("/login", {
+      email: "returning@calora.local",
+    });
+
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as {
+      userId: string;
+      goal: { kcal: number };
+    };
+    expect(body.userId).toBe(created.userId);
+    expect(body.goal.kcal).toBe(created.goal.kcal);
+  });
+
+  it("says which field is wrong when the account does not exist", async () => {
+    const response = await post("/login", { email: "stranger@calora.local" });
+
+    expect(response.status).toBe(404);
+
+    const body = (await response.json()) as {
+      error: string;
+      fields?: Record<string, string>;
+    };
+    expect(body.error).toBe("account_not_found");
+    // Rendered against the email input, not as an anonymous banner.
+    expect(body.fields?.email).toBeTypeOf("string");
+  });
+
+  it("rejects an email it could never match", async () => {
+    expect((await post("/login", { email: "not-an-email" })).status).toBe(400);
+  });
+});
+
 describe("cross-origin access", () => {
   it("is refused by default", async () => {
     const response = await app.request("/health", {
