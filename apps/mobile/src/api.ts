@@ -1,3 +1,4 @@
+import type { DensityCategory, Portion } from "@calora/core";
 import Constants from "expo-constants";
 
 /**
@@ -87,12 +88,14 @@ export interface FoodDetail {
   name: string;
   brandName: string | null;
   provenance: "usda" | "openfoodfacts" | "recipe" | "user";
-  densityCategory: string | null;
+  // Narrowed by the server, so the app can hand it straight to resolveGrams
+  // without repeating the check.
+  densityCategory: DensityCategory | null;
   kcal: number;
   protein: number;
   carbs: number;
   fat: number;
-  portions: { label: string; grams: number; source: string }[];
+  portions: Portion[];
   hasRecipe: boolean;
   ingredients: string[];
 }

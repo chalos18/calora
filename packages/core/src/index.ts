@@ -31,11 +31,14 @@ export {
 } from "./nutrition.js";
 
 export {
+  offerableUnits,
   resolveGrams,
+  type FoodMeasures,
   type Portion,
   type PortionSource,
   type ResolvedGrams,
   type ResolveGramsInput,
+  type Unit,
 } from "./portions.js";
 
 export {

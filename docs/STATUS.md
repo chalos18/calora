@@ -115,6 +115,6 @@ sign-in screen — the dev server keeps `demo@calora.local` pre-onboarded and
 idempotent, so whatever you logged into it last time is still there.
 
 `pnpm lint` does **not** pass. `eslint.config.js` is newly added and the repo
-has 11 pre-existing violations under it, in six files — mostly
+has 14 pre-existing violations under it, in six files — mostly
 `no-misused-promises` on `onPress` handlers, and `any` flowing through
 `scripts/smoke.mts`. None are in the sign-in code. Worth a pass of its own.
