@@ -1,3 +1,4 @@
+import { offerableUnits, resolveGrams } from "@calora/core";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -22,9 +23,6 @@ const PROVENANCE_LABEL: Record<FoodDetail["provenance"], string> = {
   recipe: "From a recipe",
   user: "Added by a person",
 };
-
-/** Volume units are only offered when the food can actually be converted. */
-const VOLUME_UNITS = ["cup", "tbsp", "tsp", "ml"] as const;
 
 export default function FoodDetailScreen() {
   const { userId } = useSession();
@@ -73,17 +71,18 @@ export default function FoodDetailScreen() {
 
   const amount = Number(quantity) || 0;
 
-  // Resolve grams the same way the server will, so the preview matches what
-  // gets logged. Null means Calora cannot convert this unit for this food.
-  const sourcedPortion = food.portions.find((portion) => portion.label === unit);
-  const grams =
-    unit === "g"
-      ? amount
-      : sourcedPortion
-        ? sourcedPortion.grams * amount
-        : null;
+  // The same functions the server logs with, so the preview cannot disagree
+  // with what gets stored - and a Unit is offered only when it resolves.
+  const measures = {
+    portions: food.portions,
+    ...(food.densityCategory ? { densityCategory: food.densityCategory } : {}),
+  };
 
-  const isEstimated = grams !== null && unit !== "g" && !sourcedPortion;
+  const unitOptions = offerableUnits(measures);
+  const resolved = resolveGrams({ quantity: amount, unit, ...measures });
+
+  const grams = resolved?.grams ?? null;
+  const isEstimated = resolved?.isEstimated ?? false;
 
   const factor = grams === null ? 0 : grams / 100;
   const preview = {
@@ -92,16 +91,6 @@ export default function FoodDetailScreen() {
     carbs: food.carbs * factor,
     fat: food.fat * factor,
   };
-
-  const unitOptions = [
-    "g",
-    ...food.portions.map((portion) => portion.label),
-    ...VOLUME_UNITS.filter(
-      (candidate) =>
-        food.densityCategory !== null &&
-        !food.portions.some((portion) => portion.label === candidate),
-    ),
-  ];
 
   const save = async () => {
     if (!userId) return;
@@ -156,6 +145,7 @@ export default function FoodDetailScreen() {
           value={quantity}
           onChangeText={setQuantity}
           keyboardType="decimal-pad"
+          accessibilityLabel="Quantity"
           style={styles.amountInput}
         />
         <View style={styles.chipRow}>

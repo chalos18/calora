@@ -45,6 +45,26 @@ describe("getFood", () => {
     ]);
   });
 
+  it("returns a density category the density table recognises", async () => {
+    await db.query(`UPDATE foods SET density_category = 'milk' WHERE id = $1`, [
+      foodId,
+    ]);
+
+    expect((await getFood(db, foodId))?.densityCategory).toBe("milk");
+  });
+
+  it("drops a density category the table does not know, rather than passing it on", async () => {
+    // The column is free text. Handing an unrecognised value to a caller means
+    // it multiplies by undefined downstream - logFood has always guarded this,
+    // and the read path now guards it too.
+    await db.query(
+      `UPDATE foods SET density_category = 'antimatter' WHERE id = $1`,
+      [foodId],
+    );
+
+    expect((await getFood(db, foodId))?.densityCategory).toBeNull();
+  });
+
   it("reports whether the food has a recipe, so ingredients can be shown", async () => {
     expect((await getFood(db, foodId))?.hasRecipe).toBe(false);
 

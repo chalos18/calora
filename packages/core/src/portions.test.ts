@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveGrams } from "./portions.js";
+import {
+  offerableUnits,
+  resolveGrams,
+  type FoodMeasures,
+} from "./portions.js";
 
 const noPortions = { portions: [] };
 
@@ -78,5 +82,69 @@ describe("resolveGrams", () => {
         resolveGrams({ quantity: 1, unit: "cup", ...noPortions }),
       ).toBeNull();
     });
+  });
+});
+
+describe("offerableUnits", () => {
+  it("always offers grams", () => {
+    expect(offerableUnits(noPortions)).toEqual(["g"]);
+  });
+
+  it("offers every sourced portion, in the order they were given", () => {
+    expect(
+      offerableUnits({
+        portions: [
+          { label: "cup", grams: 172, source: "usda" },
+          { label: "serving", grams: 130, source: "usda" },
+        ],
+      }),
+    ).toEqual(["g", "cup", "serving"]);
+  });
+
+  it("offers volume units when the food has a density category", () => {
+    expect(offerableUnits({ ...noPortions, densityCategory: "oil" })).toEqual([
+      "g",
+      "ml",
+      "tsp",
+      "tbsp",
+      "cup",
+    ]);
+  });
+
+  it("does not offer a volume unit twice when it is also a sourced portion", () => {
+    const units = offerableUnits({
+      portions: [{ label: "cup", grams: 165, source: "usda" }],
+      densityCategory: "legume_cooked",
+    });
+
+    expect(units.filter((unit) => unit === "cup")).toHaveLength(1);
+  });
+
+  it("offers no volume units without a density category, because none convert", () => {
+    expect(offerableUnits({ portions: [] })).not.toContain("cup");
+  });
+
+  /**
+   * The invariant the two functions exist to keep together: the screen offers a
+   * Unit only when Calora can turn it into grams. Previously the offer list and
+   * the conversion were written separately and disagreed - a volume unit was
+   * offered for any food with a density category, then resolved to nothing.
+   */
+  it("offers only Units that resolveGrams can actually convert", () => {
+    const cases: FoodMeasures[] = [
+      { portions: [], densityCategory: "oil" },
+      { portions: [] },
+      {
+        portions: [{ label: "cup", grams: 165, source: "usda" }],
+        densityCategory: "legume_cooked",
+      },
+      { portions: [{ label: "slice", grams: 28, source: "off" }] },
+    ];
+
+    for (const food of cases) {
+      for (const unit of offerableUnits(food)) {
+        expect(resolveGrams({ quantity: 1, unit, ...food })).not.toBeNull();
+      }
+    }
   });
 });

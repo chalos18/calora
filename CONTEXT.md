@@ -24,7 +24,16 @@ _Avoid_: dish, meal
 A named quantity of a particular Food with its weight in grams — "1 cup" → 172 g.
 Portions belong to a Food, because the same name weighs different amounts
 depending on what is being measured.
-_Avoid_: serving, unit, measure
+_Avoid_: serving, measure. Do not use Portion and Unit interchangeably — a
+Portion is a weight Calora holds for a Food, a Unit is how a person asked for it.
+
+**Unit**:
+How an amount of a Food is expressed when it is logged — grams, a volume
+("tbsp"), or the label of one of that Food's Portions. Not every Unit is a
+Portion: "tbsp" can be converted through density for a Food that has no tbsp
+Portion, and grams are a Unit that belongs to no Food in particular. A Unit is
+only ever offered when Calora can turn it into grams.
+_Avoid_: serving, measure
 
 **Provenance**:
 Where a Food's nutrition data came from, and therefore how much it should be

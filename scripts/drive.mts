@@ -147,6 +147,35 @@ if (rows > 0) {
   console.log("   opened food detail:", page.url());
 }
 
+// Broccoli has a density category and a 'chopped' portion, but no 'tbsp' one,
+// so picking tbsp is the case that can only be answered through the density
+// table. The screen used to offer the unit and then report no weight for it.
+console.log("\n10. a volume unit resolved through the density table");
+await page.goto(`${APP}/food/00000000-0000-4000-8000-000000321900`, {
+  waitUntil: "networkidle",
+});
+await page.waitForTimeout(2500);
+
+const offered = await Promise.all(
+  ["g", "chopped", "tbsp", "cup"].map(async (unit) => {
+    const shown = await page.getByText(unit, { exact: true }).count();
+    return `${unit}=${shown > 0 ? "offered" : "MISSING"}`;
+  }),
+);
+console.log("   units:", offered.join(" "));
+
+await page.getByText("tbsp", { exact: true }).click();
+await page.getByLabel("Quantity").fill("1");
+await page.waitForTimeout(700);
+
+// pnpm smoke asserts the server resolves this to 9 g. The preview has to agree,
+// which is the whole point of the app and the server sharing one rule.
+const detail = await page.locator("body").innerText();
+console.log("   1 tbsp shows:", /≈?\s*\d+ g\b/.exec(detail)?.[0]?.trim());
+console.log("   marked estimated:", detail.includes("≈"));
+console.log("   refuses to convert:", detail.includes("has no weight for one"));
+await shot("12-density-fallback");
+
 await browser.close();
 
 console.log(`\nscreenshots in ${OUT}`);

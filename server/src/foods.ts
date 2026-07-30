@@ -1,4 +1,9 @@
-import type { Portion, Provenance } from "@calora/core";
+import {
+  isDensityCategory,
+  type DensityCategory,
+  type Portion,
+  type Provenance,
+} from "@calora/core";
 import type { Db } from "./db.js";
 
 export interface FoodDetail {
@@ -6,7 +11,13 @@ export interface FoodDetail {
   name: string;
   brandName: string | null;
   provenance: Provenance;
-  densityCategory: string | null;
+  /**
+   * Narrowed here rather than passed through, so every reader gets a category
+   * the density table actually knows. `logFood` has always validated this on
+   * the way in; the read path handing out the raw column meant the app could
+   * not use it without repeating the check.
+   */
+  densityCategory: DensityCategory | null;
   kcal: number;
   protein: number;
   carbs: number;
@@ -63,7 +74,9 @@ export const getFood = async (
     name: row.name as string,
     brandName: row.brand_name ?? null,
     provenance: row.provenance as Provenance,
-    densityCategory: row.density_category ?? null,
+    densityCategory: isDensityCategory(row.density_category)
+      ? row.density_category
+      : null,
     kcal: Number(row.kcal),
     protein: Number(row.protein),
     carbs: Number(row.carbs),
